@@ -1,0 +1,32 @@
+实现一个虚拟内存分页模拟器（二级页表 + TLB + LRU 置换），
+只用 Python 标准库。
+
+背景：paging.py 是骨架（PagingSimulator 类方法 raise
+NotImplementedError），tests/test_paging.py 是验收测试。
+
+需求（feature，仿操作系统虚拟内存核心语义）：
+1. 地址拆分：virtual_bits=16 位地址；页大小 2**page_bits=64B；
+   页号拆两级：L1 索引（高 5 位）+ L2 索引（低 5 位），
+   页内偏移为最低 6 位
+2. 页表：按需建立 L1 -> L2 -> {frame, dirty}；表项缺失即缺页，
+   缺页分配帧（frame_count 帧）
+3. TLB（tlb_size 条，LRU）：vpn -> frame；命中直接返回物理地址
+   并提升 LRU；满时淘汰最久未用条目（evictions 计数）
+4. 缺页换帧：无空闲帧时按 LRU 置换（last_used 最小者）；
+   被置换页若 dirty 则写回主存（dirty_writebacks 计数），
+   并从页表与 TLB 移除旧映射
+5. 写访问：置帧与页表表项 dirty；读访问不变
+6. access(vaddr, write=False) -> int：返回物理地址
+   （frame * 64 + offset）
+7. stats() -> {accesses, tlb_hits, tlb_misses, page_faults,
+   evictions, dirty_writebacks}
+
+验收：
+- python -m pytest tests/test_paging.py -q 全绿
+- 覆盖：TLB 命中/每新页一次缺页/TLB LRU 淘汰/物理地址偏移正确/
+  帧 LRU 置换（最早页被逐出，重访重新缺页）/写脏页置换写回/
+  干净页置换不写回/跨 L1 的二级页表/统计字段
+
+要求：
+- 只 import 标准库；页表、TLB、置换算法必须真实实现
+  （禁止直接线性映射所有地址）；别改测试
